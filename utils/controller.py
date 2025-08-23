@@ -14,39 +14,45 @@ from utils.rotation import q_rot6d_to_q_euler
 
 
 def get_link_dir(robot_name, joint_name):
-    if joint_name.startswith('virtual'):
+    if joint_name.startswith("virtual"):
         return None
 
-    if robot_name == 'allegro':
-        if joint_name in ['joint_0.0', 'joint_4.0', 'joint_8.0', 'joint_13.0']:
+    if robot_name == "allegro":
+        if joint_name in ["joint_0.0", "joint_4.0", "joint_8.0", "joint_13.0"]:
             return None
         link_dir = torch.tensor([0, 0, 1], dtype=torch.float32)
-    elif robot_name == 'barrett':
-        if joint_name in ['bh_j11_joint', 'bh_j21_joint']:
+    elif robot_name == "barrett":
+        if joint_name in ["bh_j11_joint", "bh_j21_joint"]:
             return None
         link_dir = torch.tensor([-1, 0, 0], dtype=torch.float32)
-    elif robot_name == 'ezgripper':
+    elif robot_name == "ezgripper":
         link_dir = torch.tensor([1, 0, 0], dtype=torch.float32)
-    elif robot_name == 'robotiq_3finger':
-        if joint_name in ['gripper_fingerB_knuckle', 'gripper_fingerC_knuckle']:
+    elif robot_name == "robotiq_3finger":
+        if joint_name in ["gripper_fingerB_knuckle", "gripper_fingerC_knuckle"]:
             return None
         link_dir = torch.tensor([0, 0, -1], dtype=torch.float32)
-    elif robot_name == 'shadowhand':
-        if joint_name in ['WRJ2', 'WRJ1']:
+    elif robot_name == "shadowhand":
+        if joint_name in ["WRJ2", "WRJ1"]:
             return None
-        if joint_name != 'THJ5':
+        if joint_name != "THJ5":
             link_dir = torch.tensor([0, 0, 1], dtype=torch.float32)
         else:
             link_dir = torch.tensor([1, 0, 0], dtype=torch.float32)
-    elif robot_name == 'leaphand':
-        if joint_name in ['13']:
+    elif robot_name == "leaphand":
+        if joint_name in ["13"]:
             return None
-        if joint_name in ['0', '4', '8']:
+        if joint_name in ["0", "4", "8"]:
             link_dir = torch.tensor([1, 0, 0], dtype=torch.float32)
-        elif joint_name in ['1', '5', '9', '12', '14']:
+        elif joint_name in ["1", "5", "9", "12", "14"]:
             link_dir = torch.tensor([0, 1, 0], dtype=torch.float32)
         else:
             link_dir = torch.tensor([0, -1, 0], dtype=torch.float32)
+    elif robot_name == "abilityhand":
+        # if joint_name in ["thumb_q1"]:
+        # link_dir = torch.tensor([-1, 0, 0], dtype=torch.float32)
+        # else:
+        link_dir = torch.tensor([1, 0, 0], dtype=torch.float32)
+
     else:
         raise NotImplementedError(f"Unknown robot name: {robot_name}!")
 
@@ -87,12 +93,28 @@ def controller(robot_name, q_para):
         outer_q, inner_q = q.clone(), q.clone()
         for joint_name, dot in joint_dots.items():
             idx = joint_orders.index(joint_name)
-            if robot_name == 'robotiq_3finger':  # open -> upper, close -> lower
-                outer_q[idx] += 0.25 * ((outer_q[idx] - lower_q[idx]) if dot <= 0 else (outer_q[idx] - upper_q[idx]))
-                inner_q[idx] += 0.15 * ((inner_q[idx] - upper_q[idx]) if dot <= 0 else (inner_q[idx] - lower_q[idx]))
+            if robot_name == "robotiq_3finger":  # open -> upper, close -> lower
+                outer_q[idx] += 0.25 * (
+                    (outer_q[idx] - lower_q[idx])
+                    if dot <= 0
+                    else (outer_q[idx] - upper_q[idx])
+                )
+                inner_q[idx] += 0.15 * (
+                    (inner_q[idx] - upper_q[idx])
+                    if dot <= 0
+                    else (inner_q[idx] - lower_q[idx])
+                )
             else:  # open -> lower, close -> upper
-                outer_q[idx] += 0.25 * ((lower_q[idx] - outer_q[idx]) if dot >= 0 else (upper_q[idx] - outer_q[idx]))
-                inner_q[idx] += 0.15 * ((upper_q[idx] - inner_q[idx]) if dot >= 0 else (lower_q[idx] - inner_q[idx]))
+                outer_q[idx] += 0.25 * (
+                    (lower_q[idx] - outer_q[idx])
+                    if dot >= 0
+                    else (upper_q[idx] - outer_q[idx])
+                )
+                inner_q[idx] += 0.15 * (
+                    (upper_q[idx] - inner_q[idx])
+                    if dot >= 0
+                    else (lower_q[idx] - inner_q[idx])
+                )
         outer_q_batch.append(outer_q)
         inner_q_batch.append(inner_q)
 
