@@ -1,0 +1,34 @@
+# defaults:
+#     - model.yaml
+#     - dataset: dataset/cmap_dataset.yaml
+#     - _self_
+# Corrected inference.yaml
+
+defaults:
+  - model.yaml # This will look for model.yaml
+  - dataset: cmap_dataset # This will look for dataset/cmap_dataset.yaml
+  - _self_ # Special keyword to apply this file's settings last
+
+# --- Overrides are now placed below the defaults list ---
+
+model:
+  encoder:
+    pretrain: null
+
+dataset:
+  batch_size: 100
+
+split_batch_size: 25
+gpu: 0
+name: '3robots'
+validate_epochs:
+  - 10
+    # - 20
+    # - 30
+    # - 40
+#    - 50
+#    - 60
+#    - 70
+#    - 80
+#    - 90
+#    - 100

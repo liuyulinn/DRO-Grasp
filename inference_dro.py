@@ -25,7 +25,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 NETWORK = None
 HAND_MODELS = {}
 
-checkpoint_path = "/home/yulin/Documents/dynamics/DRO-Grasp/ckpt/model/model_3robots.pth"  # IMPORTANT: Change this path
+checkpoint_path = f"{ROOT_DIR}/ckpt/model/model_3robots.pth"  # IMPORTANT: Change this path
 
 
 # how to use this hydra here ?
@@ -39,6 +39,7 @@ class GraspPoseProposal:
         self.batch_size = cfg.dataset.batch_size
         # self.hand_names = hand_names
         self.num_points = 512
+        # import pdb; pdb.set_trace()
         self.object_pc_type = cfg.dataset.object_pc_type
 
         network = create_network(cfg.model, mode="validate").to(device)
@@ -251,6 +252,22 @@ class GraspPoseProposal:
             "mlat_pc": mlat_pc_batch,
             "predict_transform": transform_batch,
         }
+    
+    def get_urdf(self, hand_name: str):
+        if hand_name not in self.hand_models:
+            self.hand_models[hand_name] = create_hand_model(
+                hand_name, device=self.device
+            )
+        hand = self.hand_models[hand_name]
+        return hand.urdf_path
+    
+    def get_joint_order(self, hand_name: str):
+        if hand_name not in self.hand_models:
+            self.hand_models[hand_name] = create_hand_model(
+                hand_name, device=self.device
+            )
+        hand = self.hand_models[hand_name]
+        return hand.get_joint_orders()
 
 
 # This is the main entry point for the script, decorated by Hydra
