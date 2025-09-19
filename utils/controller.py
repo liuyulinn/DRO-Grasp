@@ -52,7 +52,16 @@ def get_link_dir(robot_name, joint_name):
         # link_dir = torch.tensor([-1, 0, 0], dtype=torch.float32)
         # else:
         link_dir = torch.tensor([1, 0, 0], dtype=torch.float32)
-
+    elif robot_name == "xhand":
+        # link_dir = torch.tensor([0, 1, 0], dtype=torch.float32)
+        if joint_name in ["right_hand_index_bend_joint"]:
+            link_dir = torch.tensor([0, 0, 1], dtype=torch.float32)
+        elif any(part in joint_name for part in ["mid", "ring", "pinky"]):
+            link_dir = torch.tensor([0, 0, 1], dtype=torch.float32)
+        elif joint_name in ["right_hand_index_joint1", "right_hand_index_joint2"]:
+            link_dir = torch.tensor([0, 0, 1], dtype=torch.float32)
+        else:
+            link_dir = torch.tensor([0, 1, 0], dtype=torch.float32)
     else:
         raise NotImplementedError(f"Unknown robot name: {robot_name}!")
 

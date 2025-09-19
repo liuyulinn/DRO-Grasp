@@ -16,7 +16,7 @@ from utils.se3_transform import compute_link_pose
 from utils.optimization import process_transform, create_problem, optimization
 import warnings
 
-# from utils_dexwm.wis3d_new import Wis3D
+from utils_dexwm.wis3d_new import Wis3D, SAPIENKinematicsModelStandalone
 import hydra
 
 # --- Global variables for models to avoid reloading on every call ---
@@ -25,7 +25,9 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 NETWORK = None
 HAND_MODELS = {}
 
-checkpoint_path = f"{ROOT_DIR}/ckpt/model/model_3robots.pth"  # IMPORTANT: Change this path
+checkpoint_path = (
+    f"{ROOT_DIR}/ckpt/model/model_3robots.pth"  # IMPORTANT: Change this path
+)
 
 
 # how to use this hydra here ?
@@ -152,7 +154,9 @@ class GraspPoseProposal:
             "object_pc": object_pc_batch,
         }
 
-    def predict_grasp_pose(self, hand_name: str, object_name: str, object_path: str):
+    def predict_grasp_pose(
+        self, hand_name: str, object_name: str, object_path: str, debug=False
+    ):
         data = self.prepare_data(hand_name, object_name, object_path)
 
         device = self.device
@@ -193,7 +197,12 @@ class GraspPoseProposal:
 
             layer = create_problem(hand.pk_chain, optim_transform.keys())
             start_time = time.time()
-            predict_q = optimization(hand.pk_chain, layer, initial_q, optim_transform)
+            predict_q = optimization(
+                hand.pk_chain,
+                layer,
+                initial_q,
+                optim_transform,  # , n_iter=300
+            )
             end_time = time.time()
             print(
                 f"[{data_count}/{batch_size}] Optimization time: {end_time - start_time:.4f} s"
@@ -222,37 +231,52 @@ class GraspPoseProposal:
         # import pdb
 
         # pdb.set_trace()
-        """Visualization using Wis3D
-        wis3d = Wis3D(
-            out_folder="wis3d",
-            sequence_name=object_name,
-            xyz_pattern=("x", "-y", "-z"),
-        )
+        if debug:
+            wis3d = Wis3D(
+                out_folder="wis3d",
+                sequence_name=object_name,
+                xyz_pattern=("x", "-y", "-z"),
+            )
 
-        object_pc_batch = object_pc_batch.cpu().numpy()
-        mlat_pc_batch = mlat_pc_batch.cpu().numpy()
-        # robot_pc = robot_pc.cpu().numpy()
-        predict_q_batch = predict_q_batch.cpu().numpy()
-        initial_q_batch = initial_q_batch.cpu().numpy()
+            object_pc_batch = object_pc_batch.cpu().numpy()
+            mlat_pc_batch = mlat_pc_batch.cpu().numpy()
+            # robot_pc = robot_pc.cpu().numpy()
+            predict_q_batch_clone = predict_q_batch.clone().cpu().numpy()
+            initial_q_batch = initial_q_batch.cpu().numpy()
 
-        for i in range(self.batch_size):
-            wis3d.set_scene_id(i)
-            wis3d.add_point_cloud(object_pc_batch[i], name="object_pc")
-            wis3d.add_point_cloud(mlat_pc_batch[i], name="mlat_pc")
+            dro_q_order = hand.get_joint_orders()
+            vis_robot = SAPIENKinematicsModelStandalone(hand.urdf_path)
+            vis_q_order = [j.name for j in vis_robot.robot.get_active_joints()]
+
+            print("dro_q_order", dro_q_order)
+            print("vis_q_order", vis_q_order)
             # import pdb
 
             # pdb.set_trace()
-            # wis3d.add_point_cloud(robot_pc[i], name="robot_pc")
-            wis3d.add_robot(hand.urdf_path, predict_q_batch[i], name="robot_pred")
-            wis3d.add_robot(hand.urdf_path, initial_q_batch[i], name="robot_init")
-        """
+            dro_to_vis = [dro_q_order.index(name) for name in vis_q_order]
+
+            for i in range(self.batch_size):
+                wis3d.set_scene_id(i)
+                wis3d.add_point_cloud(object_pc_batch[i], name="object_pc")
+                wis3d.add_point_cloud(mlat_pc_batch[i], name="mlat_pc")
+                # import pdb
+
+                # pdb.set_trace()
+                # wis3d.add_point_cloud(robot_pc[i], name="robot_pc")
+                wis3d.add_robot(
+                    hand.urdf_path,
+                    predict_q_batch_clone[i][dro_to_vis],
+                    name="robot_pred",
+                )
+                # wis3d.add_robot(hand.urdf_path, initial_q_batch[i], name="robot_init")
+
         return {
             "predict_q": predict_q_batch,
             "object_pc": object_pc_batch,
             "mlat_pc": mlat_pc_batch,
             "predict_transform": transform_batch,
         }
-    
+
     def get_urdf(self, hand_name: str):
         if hand_name not in self.hand_models:
             self.hand_models[hand_name] = create_hand_model(
@@ -260,7 +284,7 @@ class GraspPoseProposal:
             )
         hand = self.hand_models[hand_name]
         return hand.urdf_path
-    
+
     def get_joint_order(self, hand_name: str):
         if hand_name not in self.hand_models:
             self.hand_models[hand_name] = create_hand_model(
