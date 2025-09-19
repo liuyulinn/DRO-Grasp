@@ -11,5 +11,5 @@ tmp/
 validate_output/
 vis_info/
 
-utils_dexwm/ 
+# utils_dexwm/ 
 wis3d/ 
