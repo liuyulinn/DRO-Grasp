@@ -234,7 +234,7 @@ class GraspPoseProposal:
         if debug:
             wis3d = Wis3D(
                 out_folder="wis3d",
-                sequence_name=object_name,
+                sequence_name=f"dro_{object_name}",
                 xyz_pattern=("x", "-y", "-z"),
             )
 
