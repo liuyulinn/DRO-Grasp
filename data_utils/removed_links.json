@@ -6,5 +6,6 @@
     "shadowhand": ["forearm", "wrist", "ffknuckle", "mfknuckle", "rfknuckle", "lfknuckle", "thbase"],
     "leaphand": [],
     "abilityhand": [],
-    "xhand": ["right_hand_ee_link", "right_hand_thumb_rota_tip", "right_hand_index_rota_tip", "right_hand_mid_tip", "right_hand_ring_tip", "right_hand_pinky_tip"]
+    "xhand": ["right_hand_ee_link", "right_hand_thumb_rota_tip", "right_hand_index_rota_tip", "right_hand_mid_tip", "right_hand_ring_tip", "right_hand_pinky_tip"],
+    "sharpa": ["right_thumb_fingertip", "right_index_fingertip", "right_middle_fingertip", "right_ring_fingertip", "right_pinky_fingertip"]
 }

@@ -62,6 +62,9 @@ def get_link_dir(robot_name, joint_name):
             link_dir = torch.tensor([0, 0, 1], dtype=torch.float32)
         else:
             link_dir = torch.tensor([0, 1, 0], dtype=torch.float32)
+    elif robot_name == "sharpa":
+        link_dir = torch.tensor([1, 0, 0], dtype=torch.float32)
+
     else:
         raise NotImplementedError(f"Unknown robot name: {robot_name}!")
 
