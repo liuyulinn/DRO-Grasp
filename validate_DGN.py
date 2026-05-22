@@ -117,8 +117,33 @@ def find_grasp_npys(graspdata_root: str, object_glob: str, scene_kind_glob: str)
     return out
 
 
-def resolve_dgn_object_urdf(object_id: str) -> str:
-    return os.path.join(DGN_PROCESSED_ROOT, object_id, "urdf", "coacd.urdf")
+def resolve_dgn_object_urdf(object_id: str, dgn_root: str = None) -> str:
+    """Path to <dgn_root>/processed_data/<object_id>/urdf/coacd.urdf.
+
+    Defaults to the in-repo DGN tree (data/object/DGN_2k_origin) when
+    `dgn_root` is None, matching inference_DGN.DGN_PROCESSED_ROOT.
+    """
+    if dgn_root is None:
+        return os.path.join(DGN_PROCESSED_ROOT, object_id, "urdf", "coacd.urdf")
+    return os.path.join(dgn_root, "processed_data", object_id, "urdf", "coacd.urdf")
+
+
+def remap_scene_cfg_path(orig_path: str, dgn_root: str) -> str:
+    """Rewrite an embedded BODex `scene_path` against a user-provided DGN root.
+
+    BODex stores absolute paths like
+        .../DGN_2k_origin/scene_cfg/<obj_id>/<scene_kind>/<stem>.npy
+    valid only on the machine that wrote them. We keep the trailing
+    <obj_id>/<scene_kind>/<stem>.npy tail and join under <dgn_root>/scene_cfg/.
+    """
+    parts = orig_path.replace("\\", "/").split("/")
+    if "scene_cfg" in parts:
+        i = parts.index("scene_cfg")
+        tail = parts[i + 1:]
+    else:
+        # Fallback: assume the last three components are <obj>/<scene_kind>/<stem>.npy
+        tail = parts[-3:]
+    return os.path.join(dgn_root, "scene_cfg", *tail)
 
 
 def call_isaac_main_dgn(
@@ -186,6 +211,13 @@ def main():
     p.add_argument("--obj-end", type=int, default=None)
     p.add_argument("--log-name", default=None,
                    help="basename for the per-scene log (default: validate_DGN_<bodex_hand>)")
+    p.add_argument(
+        "--dgn-root", default=None,
+        help="Override the DGN_2k_origin root. Used to (a) remap the absolute "
+             "scene_path embedded in each grasp .npy onto <dgn_root>/scene_cfg/... "
+             "and (b) load object URDFs from <dgn_root>/processed_data/<obj>/urdf/. "
+             "Defaults to inference_DGN.DGN_PROCESSED_ROOT (the in-repo data tree).",
+    )
     args = p.parse_args()
 
     sim_dir = args.bodex_hand.split("/")[0]
@@ -243,11 +275,13 @@ def main():
             cprint(f"[skip] no scene_path in {npy}", "yellow")
             continue
         scene_cfg_path = str(scene_paths[0])
+        if args.dgn_root is not None:
+            scene_cfg_path = remap_scene_cfg_path(scene_cfg_path, args.dgn_root)
         if not os.path.exists(scene_cfg_path):
             cprint(f"[skip] scene_cfg not on disk: {scene_cfg_path}", "yellow")
             continue
         info = load_dgn_scene_cfg(scene_cfg_path)
-        object_urdf = resolve_dgn_object_urdf(object_id)
+        object_urdf = resolve_dgn_object_urdf(object_id, args.dgn_root)
         if not os.path.exists(object_urdf):
             cprint(f"[skip] urdf missing: {object_urdf}", "yellow")
             continue
