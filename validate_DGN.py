@@ -33,6 +33,17 @@ import sys
 import warnings
 
 import numpy as np
+
+# Allow NumPy 2.x pickles to load under NumPy 1.x (BODex output is saved with NumPy 2.x)
+import numpy.core as _np_core
+sys.modules.setdefault("numpy._core", _np_core)
+for _sub in ("multiarray", "numeric", "_methods", "fromnumeric", "umath", "_dtype"):
+    try:
+        _m = __import__(f"numpy.core.{_sub}", fromlist=[_sub])
+        sys.modules.setdefault(f"numpy._core.{_sub}", _m)
+    except ImportError:
+        pass
+
 import torch
 from scipy.spatial.transform import Rotation as R
 from termcolor import cprint

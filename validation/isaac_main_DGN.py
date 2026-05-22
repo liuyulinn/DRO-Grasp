@@ -19,12 +19,12 @@ from isaacgym import gymtorch  # noqa: F401
 
 import os
 import sys
-import re
 import json
 import shutil
 import tempfile
 import argparse
 import warnings
+import xml.etree.ElementTree as ET
 from termcolor import cprint
 
 import torch
@@ -37,31 +37,53 @@ from utils.hand_model import create_hand_model
 from utils.rotation import q_rot6d_to_q_euler
 
 
-_MESH_TAG_RE = re.compile(
-    r'<mesh\s+filename="([^"]+)"(?:\s+scale="[^"]*")?\s*/>'
-)
-
-
 def write_scaled_dgn_urdf(orig_urdf: str, scale_xyz, out_path: str) -> str:
-    """Copy a DGN coacd.urdf into out_path, rewriting every <mesh .../> tag with
-    the requested per-axis scale and absolute mesh paths so IsaacGym can load
-    the URDF from anywhere on disk."""
+    """Copy a DGN coacd.urdf into out_path, collapsing every <link> into a
+    single rigid body. Each <mesh> is rewritten with per-axis scale and an
+    absolute filename so IsaacGym can load the URDF from anywhere on disk.
+
+    Single-link is required because validation.isaac_validator.run_sim
+    indexes the per-env rigid-body state as if the object were one body
+    ([:, 0, :] for the object force/state)."""
     orig_urdf = os.path.abspath(orig_urdf)
     base_dir = os.path.dirname(orig_urdf)
     sx, sy, sz = float(scale_xyz[0]), float(scale_xyz[1]), float(scale_xyz[2])
+    scale_str = f"{sx} {sy} {sz}"
 
-    with open(orig_urdf, "r") as f:
-        text = f.read()
+    tree = ET.parse(orig_urdf)
+    root = tree.getroot()
 
-    def repl(m):
-        filename = m.group(1)
-        if not os.path.isabs(filename):
-            filename = os.path.normpath(os.path.join(base_dir, filename))
-        return f'<mesh filename="{filename}" scale="{sx} {sy} {sz}"/>'
+    visuals, collisions = [], []
+    for link in list(root.findall("link")):
+        visuals.extend(link.findall("visual"))
+        collisions.extend(link.findall("collision"))
+        root.remove(link)
+    for joint in list(root.findall("joint")):
+        root.remove(joint)
 
-    text = _MESH_TAG_RE.sub(repl, text)
-    with open(out_path, "w") as f:
-        f.write(text)
+    for geom_list in (visuals, collisions):
+        for g in geom_list:
+            for mesh in g.iter("mesh"):
+                fn = mesh.get("filename", "")
+                if fn and not os.path.isabs(fn):
+                    fn = os.path.normpath(os.path.join(base_dir, fn))
+                mesh.set("filename", fn)
+                mesh.set("scale", scale_str)
+
+    new_link = ET.SubElement(root, "link", attrib={"name": "object"})
+    inertial = ET.SubElement(new_link, "inertial")
+    ET.SubElement(inertial, "origin", attrib={"xyz": "0 0 0", "rpy": "0 0 0"})
+    ET.SubElement(inertial, "mass", attrib={"value": "0.1"})
+    ET.SubElement(inertial, "inertia", attrib={
+        "ixx": "1e-3", "ixy": "0", "ixz": "0",
+        "iyy": "1e-3", "iyz": "0", "izz": "1e-3",
+    })
+    for v in visuals:
+        new_link.append(v)
+    for c in collisions:
+        new_link.append(c)
+
+    tree.write(out_path, xml_declaration=True, encoding="utf-8")
     return out_path
 
 
