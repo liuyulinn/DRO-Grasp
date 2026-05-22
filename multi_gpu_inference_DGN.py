@@ -89,6 +89,15 @@ def main():
     p.add_argument("--split-batch-size", type=int, default=20)
     p.add_argument("--pregrasp-factor", type=float, default=0.9)
     p.add_argument("--squeeze-factor", type=float, default=1.05)
+    p.add_argument(
+        "--obj-start", type=int, default=None,
+        help="Index into the sorted object list to start at (inclusive). "
+             "Combined with --obj-end for small-batch testing.",
+    )
+    p.add_argument(
+        "--obj-end", type=int, default=None,
+        help="Index into the sorted object list to stop at (exclusive).",
+    )
     args = p.parse_args()
 
     hand_root = os.path.join(args.bodex_input_root, args.bodex_hand)
@@ -96,17 +105,34 @@ def main():
         raise SystemExit(f"bodex hand path not found: {hand_root}")
 
     obj_dirs = list_bodex_object_dirs(hand_root, args.bodex_object_set, args.bodex_glob)
-    n_objs = len(obj_dirs)
-    n_gpus = len(args.gpu)
-    if n_objs == 0:
+    n_objs_total = len(obj_dirs)
+    if n_objs_total == 0:
         raise SystemExit(
             f"no objects matched under {hand_root} (set='{args.bodex_object_set}', glob='{args.bodex_glob}')"
         )
 
-    # Even split, with the first (n_objs % n_gpus) shards getting one extra.
+    # Restrict to the user-requested [obj_start, obj_end) window before sharding,
+    # so --obj-start/--obj-end describe a global range and shards split it evenly.
+    window_start = 0 if args.obj_start is None else args.obj_start
+    window_end = n_objs_total if args.obj_end is None else args.obj_end
+    if window_start < 0:
+        window_start = max(n_objs_total + window_start, 0)
+    if window_end < 0:
+        window_end = max(n_objs_total + window_end, 0)
+    window_start = max(0, min(window_start, n_objs_total))
+    window_end = max(window_start, min(window_end, n_objs_total))
+    n_objs = window_end - window_start
+    if n_objs == 0:
+        raise SystemExit(
+            f"empty object window [{window_start}, {window_end}) of {n_objs_total} matched objects"
+        )
+
+    n_gpus = len(args.gpu)
+
+    # Even split within the window, first (n_objs % n_gpus) shards get one extra.
     base, rem = divmod(n_objs, n_gpus)
     counts = [base + (1 if i < rem else 0) for i in range(n_gpus)]
-    starts = [sum(counts[:i]) for i in range(n_gpus)]
+    starts = [window_start + sum(counts[:i]) for i in range(n_gpus)]
     ends = [starts[i] + counts[i] for i in range(n_gpus)]
 
     runinfo_dir = os.path.join(
@@ -114,7 +140,11 @@ def main():
         datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S"),
     )
     os.makedirs(runinfo_dir, exist_ok=True)
-    print(f"[main] {n_objs} objects across {n_gpus} GPUs; runinfo -> {runinfo_dir}")
+    if window_start != 0 or window_end != n_objs_total:
+        window_msg = f" (window [{window_start},{window_end}) of {n_objs_total})"
+    else:
+        window_msg = ""
+    print(f"[main] {n_objs} objects across {n_gpus} GPUs{window_msg}; runinfo -> {runinfo_dir}")
 
     procs = []
     for i, gpu_id in enumerate(args.gpu):
