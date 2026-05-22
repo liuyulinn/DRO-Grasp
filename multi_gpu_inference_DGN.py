@@ -55,10 +55,10 @@ def worker(gpu_id, shard_idx, obj_start, obj_end, args, output_path):
         # already isolates the physical device, so cfg.gpu=0 maps to gpu_id.
         "gpu=0",
     ]
-    if args.bodex_object_set:
-        cmd.append(f"+bodex_object_set={args.bodex_object_set}")
     if args.hand_name:
         cmd.append(f"+hand_name={args.hand_name}")
+    if args.overwrite:
+        cmd.append("+overwrite=true")
 
     env = os.environ.copy()
     env["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
@@ -78,8 +78,8 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("-g", "--gpu", nargs="+", required=True, help="gpu id list, e.g. -g 0 1 2 3")
     p.add_argument("--bodex-hand", default="sim_xhand/fc_left")
-    p.add_argument("--bodex-input-root", default=BODEX_OUTPUT_ROOT)
-    p.add_argument("--bodex-object-set", default="DGN")
+    p.add_argument("--bodex-input-root", default=BODEX_OUTPUT_ROOT,
+                   help="path to a BODex graspdata/ folder (contains <object_id>/ subdirs)")
     p.add_argument("--bodex-scene-kind", default="tabletop_ur10e")
     p.add_argument("--bodex-glob", default="*", help="object_id directory glob")
     p.add_argument("--hand-name", default=None, help="DRO hand_name (auto-inferred if omitted)")
@@ -89,6 +89,10 @@ def main():
     p.add_argument("--split-batch-size", type=int, default=20)
     p.add_argument("--pregrasp-factor", type=float, default=0.9)
     p.add_argument("--squeeze-factor", type=float, default=1.05)
+    p.add_argument(
+        "--overwrite", action="store_true",
+        help="Re-run scenes whose output .npy already exists (default: skip them).",
+    )
     p.add_argument(
         "--obj-start", type=int, default=None,
         help="Index into the sorted object list to start at (inclusive). "
@@ -100,15 +104,15 @@ def main():
     )
     args = p.parse_args()
 
-    hand_root = os.path.join(args.bodex_input_root, args.bodex_hand)
+    hand_root = args.bodex_input_root
     if not os.path.isdir(hand_root):
         raise SystemExit(f"bodex hand path not found: {hand_root}")
 
-    obj_dirs = list_bodex_object_dirs(hand_root, args.bodex_object_set, args.bodex_glob)
+    obj_dirs = list_bodex_object_dirs(hand_root, args.bodex_glob)
     n_objs_total = len(obj_dirs)
     if n_objs_total == 0:
         raise SystemExit(
-            f"no objects matched under {hand_root} (set='{args.bodex_object_set}', glob='{args.bodex_glob}')"
+            f"no objects matched under {hand_root} (glob='{args.bodex_glob}')"
         )
 
     # Restrict to the user-requested [obj_start, obj_end) window before sharding,

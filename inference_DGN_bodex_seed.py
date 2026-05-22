@@ -27,8 +27,8 @@ this script:
 Usage:
   python inference_DGN_bodex_seed.py +bodex_hand=sim_xhand/fc_left
   python inference_DGN_bodex_seed.py +bodex_hand=sim_xhand/fc_right \
-      +bodex_object_set=DGN +bodex_scene_kind=tabletop_ur10e \
-      +bodex_input_root=/home/yulin/Downloads/DGN_xhand_right \
+      +bodex_scene_kind=tabletop_ur10e \
+      +bodex_input_root=/home/yulin/Downloads/DGN_xhand_right/graspdata \
       +bodex_glob='core_bottle_*'
   python inference_DGN_bodex_seed.py +bodex_hand=sim_fixsharpa/fc_right \
       hand_name=sharpa
@@ -145,44 +145,38 @@ def resolve_scene_cfg_path(bodex_data, fallback_object_id, fallback_scene_kind, 
     return candidate
 
 
-def list_bodex_object_dirs(hand_root, object_set, glob_pat):
-    """Return [(object_set, object_dir_path), ...] in sorted order. Used by the
-    multi-GPU launcher to compute contiguous slices per shard."""
-    sets = [object_set] if object_set else sorted(
-        d for d in os.listdir(hand_root) if os.path.isdir(os.path.join(hand_root, d))
-    )
+def list_bodex_object_dirs(hand_root, glob_pat):
+    """Return [object_dir_path, ...] in sorted order. `hand_root` must point
+    directly at a BODex `graspdata/` folder. Used by the multi-GPU launcher to
+    compute contiguous slices per shard."""
     out = []
-    for s in sets:
-        graspdata = os.path.join(hand_root, s, "graspdata")
-        if not os.path.isdir(graspdata):
-            continue
-        for obj_dir in sorted(glob.glob(os.path.join(graspdata, glob_pat))):
-            if os.path.isdir(obj_dir):
-                out.append((s, obj_dir))
+    for obj_dir in sorted(glob.glob(os.path.join(hand_root, glob_pat))):
+        if os.path.isdir(obj_dir):
+            out.append(obj_dir)
     return out
 
 
-def iter_bodex_scenes(hand_root, object_set, scene_kind, glob_pat,
+def iter_bodex_scenes(hand_root, scene_kind, glob_pat,
                       obj_start=None, obj_end=None):
-    """Iterate (object_set, object_id, scale_pose, grasp_npy_path) tuples.
+    """Iterate (object_id, scale_pose, grasp_npy_path) tuples.
 
     obj_start / obj_end are inclusive-exclusive indices into the sorted list of
     object directories. They let multiple processes split work without
     overlapping. If both are None, all objects are processed.
     """
-    obj_dirs = list_bodex_object_dirs(hand_root, object_set, glob_pat)
+    obj_dirs = list_bodex_object_dirs(hand_root, glob_pat)
     if obj_start is not None or obj_end is not None:
         s = 0 if obj_start is None else int(obj_start)
         e = len(obj_dirs) if obj_end is None else int(obj_end)
         obj_dirs = obj_dirs[s:e]
-    for s, obj_dir in obj_dirs:
+    for obj_dir in obj_dirs:
         object_id = os.path.basename(obj_dir)
         scene_dir = os.path.join(obj_dir, scene_kind)
         if not os.path.isdir(scene_dir):
             continue
         for npy in sorted(glob.glob(os.path.join(scene_dir, "*_grasp.npy"))):
             scale_pose = os.path.basename(npy).replace("_grasp.npy", "")
-            yield s, object_id, scale_pose, npy
+            yield object_id, scale_pose, npy
 
 
 def dro_predict_q_to_bodex_pose(
@@ -283,12 +277,12 @@ def main(cfg):
     # --- args from cfg (Hydra: pass via `+name=value` on CLI) ---
     bodex_hand = getattr(cfg, "bodex_hand", "sim_xhand/fc_left")
     bodex_input_root = getattr(cfg, "bodex_input_root", BODEX_OUTPUT_ROOT)
-    bodex_object_set = getattr(cfg, "bodex_object_set", None)
     bodex_scene_kind = getattr(cfg, "bodex_scene_kind", "tabletop_ur10e")
     bodex_glob = getattr(cfg, "bodex_glob", "*")
     out_dir = getattr(cfg, "out_dir", os.path.join(ROOT_DIR, "dro_bodex_output"))
     pregrasp_factor = float(getattr(cfg, "pregrasp_factor", 0.9))
     squeeze_factor = float(getattr(cfg, "squeeze_factor", 1.05))
+    overwrite = bool(getattr(cfg, "overwrite", False))
     obj_start = getattr(cfg, "obj_start", None)
     obj_end = getattr(cfg, "obj_end", None)
     if obj_start is not None:
@@ -306,7 +300,8 @@ def main(cfg):
             f"could not infer DRO hand_name from {bodex_hand}; pass +hand_name=..."
         )
 
-    hand_root = os.path.join(bodex_input_root, bodex_hand)
+    # hand_root = os.path.join(bodex_input_root, bodex_hand)
+    hand_root = bodex_input_root
     if not os.path.isdir(hand_root):
         raise SystemExit(f"bodex hand path not found: {hand_root}")
 
@@ -326,10 +321,19 @@ def main(cfg):
     hand_tag = bodex_hand.replace("/", "_")
     n_done = 0
     n_skipped = 0
-    for object_set, object_id, scale_pose, npy in iter_bodex_scenes(
-        hand_root, bodex_object_set, bodex_scene_kind, bodex_glob,
+    n_existing = 0
+    for object_id, scale_pose, npy in iter_bodex_scenes(
+        hand_root, bodex_scene_kind, bodex_glob,
         obj_start=obj_start, obj_end=obj_end,
     ):
+        out_npy_path = os.path.join(
+            out_dir, bodex_hand, "graspdata",
+            object_id, bodex_scene_kind, f"{scale_pose}_grasp.npy",
+        )
+        if not overwrite and os.path.exists(out_npy_path):
+            n_existing += 1
+            continue
+
         bodex_data = load_bodex_npy(npy)
         bodex_joint_names = list(bodex_data["joint_names"])
         seed_all = bodex_data["seed"][0]   # (N, 7 + dof_b)
@@ -389,13 +393,6 @@ def main(cfg):
             debug=False,
         )
 
-        # Path mirrors BODex's own layout exactly:
-        #   <out_dir>/<bodex_hand>/<obj_set>/graspdata/<obj_id>/<scene>/<scale_pose>_grasp.npy
-        out_npy_path = os.path.join(
-            out_dir, bodex_hand, object_set, "graspdata",
-            object_id, bodex_scene_kind, f"{scale_pose}_grasp.npy",
-        )
-
         predict_q = out["predict_q"].detach().cpu().numpy()  # (B, 6 + dof_d)
         robot_pose_bodex = dro_predict_q_to_bodex_pose(
             predict_q, perm, object_translation_world, src_side, dst_side
@@ -420,7 +417,10 @@ def main(cfg):
         if n_done % 10 == 0:
             print(f"[{n_done}] last out: {out_npy_path}")
 
-    print(f"done. predicted {n_done} scenes ({n_skipped} skipped) into {out_dir}")
+    print(
+        f"done. predicted {n_done} scenes "
+        f"({n_skipped} skipped, {n_existing} already existed) into {out_dir}"
+    )
 
 
 if __name__ == "__main__":
