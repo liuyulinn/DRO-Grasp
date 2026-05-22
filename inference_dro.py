@@ -60,7 +60,7 @@ class GraspPoseProposal:
         self.object_pcs = {}
 
     def prepare_data(
-        self, hand_name: str, object_name: str, object_path: str
+        self, hand_name: str, object_name: str, object_path: str, scale: float = 1.0
     ):  # , N: int):
         if hand_name not in self.hand_models:
             self.hand_models[hand_name] = create_hand_model(
@@ -94,6 +94,9 @@ class GraspPoseProposal:
                     self.object_pcs[object_name] = torch.load(
                         object_pcld_path, weights_only=False
                     )
+
+                if scale != 1.0:
+                    self.object_pcs[object_name] = self.object_pcs[object_name] * scale
             else:
                 print("!!! Using fixed object pcs !!!")
 
@@ -155,9 +158,9 @@ class GraspPoseProposal:
         }
 
     def predict_grasp_pose(
-        self, hand_name: str, object_name: str, object_path: str, debug=False
+        self, hand_name: str, object_name: str, object_path: str, debug=False, scale: float = 1.0
     ):
-        data = self.prepare_data(hand_name, object_name, object_path)
+        data = self.prepare_data(hand_name, object_name, object_path, scale=scale)
 
         device = self.device
         batch_size = self.batch_size
@@ -318,7 +321,7 @@ def main(cfg):  #: DictConfig):
         proposer.predict_grasp_pose(
             hand_name="xhand",  # This could also come from cfg
             object_name=obj,
-            object_path=f"/home/ubuntu/DRO-Grasp/data/object/DGN_2k_origin/processed_data/core_bottle_1a7ba1f4c892e2da30711cdbdbc73924/mesh/normalized.obj",
+            object_path=f"/home/yulin/workspace/DexCom/assets/misc/DGN_2k_origin/processed_data/core_bottle_1a7ba1f4c892e2da30711cdbdbc73924/mesh/normalized.obj",
         )
 
     # print("\n--- Final Predicted Poses (Tensor) ---")

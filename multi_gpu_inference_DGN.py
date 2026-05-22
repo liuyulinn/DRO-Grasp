@@ -15,8 +15,8 @@ Example:
       --batch-size 20 --split-batch-size 20
 
   # one-object smoke test on a single GPU
-  python multi_gpu_inference_DGN.py -g 0 \\
-      --bodex-glob 'core_bottle_1a7ba1f4c892e2da30711cdbdbc73924' \\
+  python multi_gpu_inference_DGN.py -g 0 \
+      --bodex-glob 'core_bottle_1a7ba1f4c892e2da30711cdbdbc73924' \
       --batch-size 20 --split-batch-size 20
 """
 
