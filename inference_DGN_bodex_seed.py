@@ -26,8 +26,9 @@ this script:
 
 Usage:
   python inference_DGN_bodex_seed.py +bodex_hand=sim_xhand/fc_left
-  python inference_DGN_bodex_seed.py +bodex_hand=sim_xhand/fc_left \
+  python inference_DGN_bodex_seed.py +bodex_hand=sim_xhand/fc_right \
       +bodex_object_set=DGN +bodex_scene_kind=tabletop_ur10e \
+      +bodex_input_root=/home/yulin/Downloads/DGN_xhand_right \
       +bodex_glob='core_bottle_*'
   python inference_DGN_bodex_seed.py +bodex_hand=sim_fixsharpa/fc_right \
       hand_name=sharpa
