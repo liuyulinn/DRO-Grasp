@@ -27,6 +27,7 @@ into validate_output/validate_DGN_<bodex_hand>.log.
 
 import argparse
 import glob
+import json
 import os
 import subprocess
 import sys
@@ -229,6 +230,16 @@ def main():
              "and (b) load object URDFs from <dgn_root>/processed_data/<obj>/urdf/. "
              "Defaults to inference_DGN.DGN_PROCESSED_ROOT (the in-repo data tree).",
     )
+    p.add_argument(
+        "--results-dir", default=None,
+        help="Directory for per-scene result markers (one JSON per scene). "
+             "Defaults to <out_dir>/<bodex_hand>/validation/. Existing markers "
+             "cause the scene to be skipped unless --overwrite is set.",
+    )
+    p.add_argument(
+        "--overwrite", action="store_true",
+        help="Re-run scenes whose marker JSON already exists (default: skip them).",
+    )
     args = p.parse_args()
 
     sim_dir = args.bodex_hand.split("/")[0]
@@ -262,8 +273,12 @@ def main():
     os.makedirs(log_dir, exist_ok=True)
     log_name = args.log_name or f"validate_DGN_{args.bodex_hand.replace('/', '_')}"
     log_path = os.path.join(log_dir, f"{log_name}.log")
+    results_dir = args.results_dir or os.path.join(
+        args.out_dir, args.bodex_hand, "validation"
+    )
+    os.makedirs(results_dir, exist_ok=True)
     print(f"[validate_DGN] hand={hand_name} bodex_hand={args.bodex_hand} "
-          f"scenes={len(entries)} log={log_path}")
+          f"scenes={len(entries)} log={log_path} results={results_dir}")
 
     dro_hand = create_hand_model(hand_name, device=torch.device("cpu"))
     dro_joint_param_names_finger = dro_hand.pk_chain.get_joint_parameter_names()[6:]
@@ -273,6 +288,31 @@ def main():
     total_num = 0
 
     for object_id, scene_kind, scale_pose, npy in entries:
+        marker_path = os.path.join(
+            results_dir, object_id, scene_kind, f"{scale_pose}_result.json"
+        )
+        if not args.overwrite and os.path.exists(marker_path):
+            try:
+                with open(marker_path) as f:
+                    prev = json.load(f)
+                n_succ_prev = int(prev["succ"])
+                n_prev = int(prev["total"])
+            except Exception as e:
+                cprint(f"[stale marker] {marker_path}: {e} -- rerunning", "yellow")
+            else:
+                cprint(
+                    f"[skip {hand_name}/{object_id}/{scene_kind}/{scale_pose}] "
+                    f"{n_succ_prev}/{n_prev} (cached)",
+                    "blue",
+                )
+                if n_succ_prev >= 0:
+                    per_object_succ.setdefault(object_id, [0, 0])
+                    per_object_succ[object_id][0] += n_succ_prev
+                    per_object_succ[object_id][1] += n_prev
+                    total_succ += n_succ_prev
+                    total_num += n_prev
+                continue
+
         raw = np.load(npy, allow_pickle=True).item()
         robot_pose = np.asarray(raw["robot_pose"])  # (1, B, 3, 7+dof_b)
         if robot_pose.ndim != 4 or robot_pose.shape[2] != 3:
@@ -341,6 +381,15 @@ def main():
         )
         with open(log_path, "a") as f:
             print(f"[{hand_name}/{object_tag}] {n_succ}/{n}", file=f)
+
+        os.makedirs(os.path.dirname(marker_path), exist_ok=True)
+        with open(marker_path, "w") as f:
+            json.dump(
+                {"succ": int(n_succ), "total": int(n),
+                 "object_id": object_id, "scene_kind": scene_kind,
+                 "scale_pose": scale_pose, "hand_name": hand_name},
+                f,
+            )
 
         if n_succ >= 0:
             per_object_succ.setdefault(object_id, [0, 0])
