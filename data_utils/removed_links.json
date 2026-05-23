@@ -1,11 +1,15 @@
 {
-    "allegro": [],
+    "allegro_right": [],
+    "allegro_left": [],
     "barrett": [],
     "ezgripper": ["base_link"],
     "robotiq_3finger": [],
     "shadowhand": ["forearm", "wrist", "ffknuckle", "mfknuckle", "rfknuckle", "lfknuckle", "thbase"],
     "leaphand": [],
     "abilityhand": [],
-    "xhand": ["right_hand_ee_link", "right_hand_thumb_rota_tip", "right_hand_index_rota_tip", "right_hand_mid_tip", "right_hand_ring_tip", "right_hand_pinky_tip"],
-    "sharpa": ["right_thumb_fingertip", "right_index_fingertip", "right_middle_fingertip", "right_ring_fingertip", "right_pinky_fingertip"]
+    "xhand_right": ["right_hand_ee_link", "right_hand_thumb_rota_tip", "right_hand_index_rota_tip", "right_hand_mid_tip", "right_hand_ring_tip", "right_hand_pinky_tip"],
+    "xhand_left": ["left_hand_ee_link", "left_hand_thumb_rota_tip", "left_hand_index_rota_tip", "left_hand_mid_tip", "left_hand_ring_tip", "left_hand_pinky_tip"],
+    "sharpa": ["right_thumb_fingertip", "right_index_fingertip", "right_middle_fingertip", "right_ring_fingertip", "right_pinky_fingertip"],
+    "fixsharpa_right": ["right_thumb_fingertip", "right_index_fingertip", "right_middle_fingertip", "right_ring_fingertip", "right_pinky_fingertip"],
+    "fixsharpa_left": ["left_thumb_fingertip", "left_index_fingertip", "left_middle_fingertip", "left_ring_fingertip", "left_pinky_fingertip"]
 }

@@ -234,6 +234,7 @@ class GraspPoseProposal:
         # import pdb
 
         # pdb.set_trace()
+        debug=True
         if debug:
             wis3d = Wis3D(
                 out_folder="wis3d",
@@ -310,16 +311,16 @@ def main(cfg):  #: DictConfig):
 
     object_name = [
         "003_cracker_box",
-        "006_mustard_bottle",
-        "024_bowl",
-        "035_power_drill",
-        "004_sugar_box",
-        "010_potted_meat_can",
+        # "006_mustard_bottle",
+        # "024_bowl",
+        # "035_power_drill",
+        # "004_sugar_box",
+        # "010_potted_meat_can",
     ]
     # Now you can call the methods
     for obj in object_name:
         proposer.predict_grasp_pose(
-            hand_name="xhand",  # This could also come from cfg
+            hand_name="xhand_left",  # This could also come from cfg
             object_name=obj,
             object_path=f"/home/yulin/workspace/DexCom/assets/misc/DGN_2k_origin/processed_data/core_bottle_1a7ba1f4c892e2da30711cdbdbc73924/mesh/normalized.obj",
         )

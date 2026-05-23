@@ -17,7 +17,11 @@ def get_link_dir(robot_name, joint_name):
     if joint_name.startswith("virtual"):
         return None
 
-    if robot_name == "allegro":
+    if robot_name == "allegro_right":
+        if joint_name in ["joint_0.0", "joint_4.0", "joint_8.0", "joint_13.0"]:
+            return None
+        link_dir = torch.tensor([0, 0, 1], dtype=torch.float32)
+    elif robot_name == "allegro_left":
         if joint_name in ["joint_0.0", "joint_4.0", "joint_8.0", "joint_13.0"]:
             return None
         link_dir = torch.tensor([0, 0, 1], dtype=torch.float32)
@@ -52,7 +56,7 @@ def get_link_dir(robot_name, joint_name):
         # link_dir = torch.tensor([-1, 0, 0], dtype=torch.float32)
         # else:
         link_dir = torch.tensor([1, 0, 0], dtype=torch.float32)
-    elif robot_name == "xhand":
+    elif robot_name == "xhand_right":
         # link_dir = torch.tensor([0, 1, 0], dtype=torch.float32)
         if joint_name in ["right_hand_index_bend_joint"]:
             link_dir = torch.tensor([0, 0, 1], dtype=torch.float32)
@@ -62,7 +66,19 @@ def get_link_dir(robot_name, joint_name):
             link_dir = torch.tensor([0, 0, 1], dtype=torch.float32)
         else:
             link_dir = torch.tensor([0, 1, 0], dtype=torch.float32)
+    elif robot_name == "xhand_left":
+        # link_dir = torch.tensor([0, 1, 0], dtype=torch.float32)
+        if joint_name in ["left_hand_index_bend_joint"]:
+            link_dir = torch.tensor([0, 0, 1], dtype=torch.float32)
+        elif any(part in joint_name for part in ["mid", "ring", "pinky"]):
+            link_dir = torch.tensor([0, 0, 1], dtype=torch.float32)
+        elif joint_name in ["left_hand_index_joint1", "left_hand_index_joint2"]:
+            link_dir = torch.tensor([0, 0, 1], dtype=torch.float32)
+        else:
+            link_dir = torch.tensor([0, -1, 0], dtype=torch.float32)
     elif robot_name == "sharpa":
+        link_dir = torch.tensor([1, 0, 0], dtype=torch.float32)
+    elif robot_name in ["fixsharpa_right", "fixsharpa_left"]:
         link_dir = torch.tensor([1, 0, 0], dtype=torch.float32)
 
     else:
