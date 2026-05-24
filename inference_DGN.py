@@ -325,7 +325,7 @@ class GraspPoseProposal:
         # import pdb
 
         # pdb.set_trace()
-        # debug=True
+        debug=True
         if debug:
             safe_object_name = object_name.replace("/", "_")
             wis3d = Wis3D(
@@ -470,7 +470,7 @@ def main(cfg):  #: DictConfig):
         # treat as a glob pattern
         npy_paths = sorted(glob.glob(npy_paths))
 
-    hand_name = getattr(cfg, "hand_name", "xhand")
+    hand_name = getattr(cfg, "hand_name", "fixsharpa_right")
     debug = bool(getattr(cfg, "debug", False))
 
     results = {}
@@ -510,8 +510,7 @@ if __name__ == "__main__":
   c892e2da30711cdbdbc73924/tabletop_ur10e/*.npy"'
 
   # every bottle, every pose
-  python inference_DGN.py
-  '+dgn_npy_paths="data/object/DGN_2k_origin/scene_cfg/*/tabletop_ur10e/*.npy"'
+  python inference_DGN.py '+dgn_npy_paths="data/object/DGN_2k_origin/scene_cfg/*/tabletop_ur10e/*.npy"'
 
   # enable wis3d debug
   python inference_DGN.py '+debug=true'

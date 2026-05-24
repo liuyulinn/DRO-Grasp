@@ -70,8 +70,6 @@ def world_grasp_to_dro_q(
     bodex_joint_names,            # list of length dof_b
     dro_joint_param_names_finger, # list of length dof_d (== dof_b expected)
     object_pose_world,            # (7,) [tx, ty, tz, qw, qx, qy, qz]
-    src_side: str,
-    dst_side: str,
 ):
     """Transform a batch of world-frame BODex grasp poses into DRO's q
     convention in the object's NATIVE mesh frame.
@@ -99,9 +97,7 @@ def world_grasp_to_dro_q(
     hand_R_native = obj_R_inv[None, :, :] @ hand_R_world           # (B, 3, 3)
     eulers_native = R.from_matrix(hand_R_native).as_euler("XYZ").astype(np.float32)
 
-    perm = build_joint_perm(
-        bodex_joint_names, dro_joint_param_names_finger, src_side, dst_side
-    )
+    perm = build_joint_perm(bodex_joint_names, dro_joint_param_names_finger)
     finger_bodex = grasp_world[:, 7:]
     finger_dro = finger_bodex[:, perm].astype(np.float32)
 
@@ -243,9 +239,6 @@ def main():
     args = p.parse_args()
 
     sim_dir = args.bodex_hand.split("/")[0]
-    side_dir = args.bodex_hand.split("/")[1] if "/" in args.bodex_hand else "fc_right"
-    src_side = "left" if side_dir.endswith("left") else "right"
-    dst_side = "right"  # all DRO URDFs in this repo are right-handed
     hand_name = args.hand_name or DEFAULT_HAND_NAME_FOR_BODEX.get(sim_dir)
     if hand_name is None:
         raise SystemExit(
@@ -343,8 +336,6 @@ def main():
                 bodex_joint_names,
                 dro_joint_param_names_finger,
                 info["pose"],
-                src_side,
-                dst_side,
             )
         except ValueError as e:
             cprint(f"[skip] joint mapping failed for {object_id}/{scale_pose}: {e}",

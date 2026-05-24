@@ -18,13 +18,13 @@ mkdir -p "data/"
 ### if gdown not installed, exit with error 
 command -v gdown >/dev/null 2>&1 || { echo >&2 "gdown is required but it's not installed. Aborting."; exit 1; }
 
-
-gdown "1aucOvtVj22HZA6-aUvejI1OR5wFSpOP4" -O "data/data_urdf.zip"
+gdown "1wfQRHYoDccZzZEEz30AOBnQfqNB4Gx7V" -O "data/data_urdf.zip"
 unzip -q "data/data_urdf.zip" -d "data/" # -q for quiet mode
 
 rm "data/data_urdf.zip"
 
-gdown "1P7Vgpsqml3OMH5p8JhsjtxQ7Dl5I7Ax6" -O "data/PointCloud.zip"
+
+gdown "1Y23-Su16JN5R__3VOenzuEUVPXyY-Dk2" -O "data/PointCloud.zip"
 unzip -q "data/PointCloud.zip" -d "data/" # -q for quiet mode
 
 rm "data/PointCloud.zip"

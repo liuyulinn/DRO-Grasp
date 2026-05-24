@@ -61,33 +61,23 @@ DEFAULT_HAND_NAME_FOR_BODEX = {
 }
 
 
-def _swap_side(name: str, src_side: str, dst_side: str) -> str:
-    """left_hand_thumb -> right_hand_thumb, etc. Substring-anchored."""
-    src = src_side + "_"
-    dst = dst_side + "_"
-    if name.startswith(src):
-        return dst + name[len(src):]
-    return name
-
-
-def build_joint_perm(bodex_joint_names, dro_joint_param_names, src_side, dst_side):
+def build_joint_perm(bodex_joint_names, dro_joint_param_names):
     """Permutation from BODex joint order -> DRO joint_parameter_names[6:].
 
     Returns a list `perm` such that q_dro_finger[i] = q_bodex[perm[i]]. Raises
-    if any DRO finger joint cannot be found in BODex names after side-swap.
+    if any DRO finger joint cannot be found in BODex names.
     """
-    bodex_swapped = [_swap_side(n, src_side, dst_side) for n in bodex_joint_names]
     perm = []
     missing = []
     for jn in dro_joint_param_names:
         try:
-            perm.append(bodex_swapped.index(jn))
+            perm.append(bodex_joint_names.index(jn))
         except ValueError:
             missing.append(jn)
     if missing:
         raise ValueError(
-            f"DRO joint(s) not found in BODex names after {src_side}->{dst_side} "
-            f"swap: {missing}\nBODex (swapped): {bodex_swapped}\nDRO: {dro_joint_param_names}"
+            f"DRO joint(s) not found in BODex names: {missing}\n"
+            f"BODex: {bodex_joint_names}\nDRO: {dro_joint_param_names}"
         )
     return perm
 
@@ -97,8 +87,6 @@ def bodex_seed_to_dro_initial_q(
     bodex_joint_names,
     dro_joint_param_names_finger,  # DRO joints excluding the 6 virtual ones
     object_translation_world,      # (3,) translation applied to the object in scene_cfg
-    src_side,
-    dst_side,
 ):
     """Convert a single BODex seed row (7 + n_b joints) -> DRO initial_q (6 + n_d joints).
 
@@ -115,9 +103,7 @@ def bodex_seed_to_dro_initial_q(
     euler_xyz = R.from_matrix(rot_mat).as_euler("XYZ")  # intrinsic, matches utils/rotation.py
 
     bodex_finger_q = bodex_seed_row[7:]
-    perm = build_joint_perm(
-        bodex_joint_names, dro_joint_param_names_finger, src_side, dst_side
-    )
+    perm = build_joint_perm(bodex_joint_names, dro_joint_param_names_finger)
     dro_finger_q = bodex_finger_q[perm]
 
     initial_q = np.concatenate([base_xyz, euler_xyz, dro_finger_q]).astype(np.float32)
@@ -183,7 +169,6 @@ def dro_predict_q_to_bodex_pose(
     predict_q,                    # (B, 6 + dof_d) DRO order: xyz + intrinsic XYZ euler + finger
     perm_bodex_to_dro,            # list[int]: dro_finger[i] = bodex_finger[perm[i]]
     object_translation_world,     # (3,)
-    src_side, dst_side,
 ):
     """Inverse of bodex_seed_to_dro_initial_q. Returns (B, 7 + dof_b) array."""
     predict_q = np.asarray(predict_q, dtype=np.float64)
@@ -292,8 +277,6 @@ def main(cfg):
 
     # DRO hand name: explicit override or guess from BODex sim folder
     sim_dir = bodex_hand.split("/")[0]
-    side_dir = bodex_hand.split("/")[1] if "/" in bodex_hand else "fc_left"
-    src_side = "left" if side_dir.endswith("left") else "right"
     hand_name = getattr(cfg, "hand_name", DEFAULT_HAND_NAME_FOR_BODEX.get(sim_dir))
     if hand_name is None:
         raise SystemExit(
@@ -307,15 +290,11 @@ def main(cfg):
 
     proposer = GraspPoseProposal(cfg)
 
-    # All DRO right-hand URDFs we care about have `right_*` joint names; we
-    # swap left->right (or right->right, no-op) when reading BODex seeds.
     dro_hand = proposer.hand_models.get(hand_name)
     if dro_hand is None:
-        # force-load to introspect joint names before the first scene
         from utils.hand_model import create_hand_model
         dro_hand = create_hand_model(hand_name, device=proposer.device)
         proposer.hand_models[hand_name] = dro_hand
-    dst_side = "right"  # all DRO URDFs in this repo are right-handed
     dro_joint_param_names_finger = dro_hand.pk_chain.get_joint_parameter_names()[6:]
 
     hand_tag = bodex_hand.replace("/", "_")
@@ -358,9 +337,7 @@ def main(cfg):
         # how many grasps it predicts per call; we tile/truncate BODex seeds to
         # exactly that count. Pre-build the joint permutation once per scene.
         try:
-            perm = build_joint_perm(
-                bodex_joint_names, dro_joint_param_names_finger, src_side, dst_side
-            )
+            perm = build_joint_perm(bodex_joint_names, dro_joint_param_names_finger)
         except ValueError as e:
             print(f"[skip] joint mapping failed for {object_id}/{scale_pose}: {e}")
             n_skipped += 1
@@ -395,7 +372,7 @@ def main(cfg):
 
         predict_q = out["predict_q"].detach().cpu().numpy()  # (B, 6 + dof_d)
         robot_pose_bodex = dro_predict_q_to_bodex_pose(
-            predict_q, perm, object_translation_world, src_side, dst_side
+            predict_q, perm, object_translation_world,
         )  # (B, 7 + dof_b)
 
         robot_pose_3stage = make_three_stage_robot_pose(
