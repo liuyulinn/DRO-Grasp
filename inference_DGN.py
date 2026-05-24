@@ -325,7 +325,7 @@ class GraspPoseProposal:
         # import pdb
 
         # pdb.set_trace()
-        debug=True
+        # debug=True
         if debug:
             safe_object_name = object_name.replace("/", "_")
             wis3d = Wis3D(

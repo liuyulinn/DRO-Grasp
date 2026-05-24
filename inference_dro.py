@@ -234,7 +234,7 @@ class GraspPoseProposal:
         # import pdb
 
         # pdb.set_trace()
-        debug=True
+        # debug=True
         if debug:
             wis3d = Wis3D(
                 out_folder="wis3d",
