@@ -1,9 +1,7 @@
 robot_names:
-  # - 'barrett'
-  # - 'allegro'
-  - 'xhand'
-  # - 'shadowhand'
-  # - 'abilityhand'
+  - 'allegro_left'
+  - 'xhand_left'
+  - 'fixsharpa_left'
 
 debug_object_names: null  # use part of the dataset, for debug only
 

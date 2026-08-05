@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import time
 import random
 import torch
@@ -12,9 +13,23 @@ from utils.hand_model import create_hand_model
 
 
 class PretrainDataset(Dataset):
-    def __init__(self, robot_names: list = None):
+    def __init__(self, robot_names: list = None, dataset_name: str = None, train_objects_only: bool = True):
+        """
+        :param dataset_name: file under data/CMapDataset_filtered/ holding {'metadata': [(q, object, robot), ...]}.
+            When None, falls back to the per-robot data/MultiDex_filtered/ layout of the original release.
+        :param train_objects_only: keep only grasps on train-split objects, so validate objects stay unseen.
+        """
         self.robot_names = robot_names if robot_names is not None \
             else ['barrett', 'allegro', 'shadowhand']
+
+        shared_metadata = None
+        if dataset_name is not None:
+            dataset_path = os.path.join(ROOT_DIR, 'data/CMapDataset_filtered', dataset_name)
+            shared_metadata = torch.load(dataset_path)['metadata']
+            if train_objects_only:
+                split_path = os.path.join(ROOT_DIR, 'data/CMapDataset_filtered/split_train_validate_objects.json')
+                train_objects = set(json.load(open(split_path))['train'])
+                shared_metadata = [m for m in shared_metadata if m[1] in train_objects]
 
         self.dataset_len = 0
         self.robot_len = {}
@@ -26,9 +41,13 @@ class PretrainDataset(Dataset):
             self.dofs.append(len(self.hands[robot_name].pk_chain.get_joint_parameter_names()))
             self.dataset[robot_name] = []
 
-            dataset_path = os.path.join(ROOT_DIR, f'data/MultiDex_filtered/{robot_name}/{robot_name}.pt')
-            dataset = torch.load(dataset_path)
-            metadata = dataset['metadata']
+            if shared_metadata is not None:
+                metadata = [m for m in shared_metadata if m[2] == robot_name]
+                assert len(metadata) > 0, f"no grasp found for '{robot_name}' in {dataset_name}"
+            else:
+                dataset_path = os.path.join(ROOT_DIR, f'data/MultiDex_filtered/{robot_name}/{robot_name}.pt')
+                dataset = torch.load(dataset_path)
+                metadata = dataset['metadata']
             self.dataset[robot_name].extend(metadata)
             self.dataset_len += len(metadata)
             self.robot_len[robot_name] = len(metadata)
@@ -54,7 +73,7 @@ class PretrainDataset(Dataset):
 
 
 def create_dataloader(cfg):
-    dataset = PretrainDataset(cfg.robot_names)
+    dataset = PretrainDataset(cfg.robot_names, dataset_name=cfg.get('dataset_name', None))
     dataloader = DataLoader(
         dataset,
         batch_size=cfg.batch_size,

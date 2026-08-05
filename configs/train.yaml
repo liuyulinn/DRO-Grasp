@@ -4,7 +4,7 @@ defaults:
   - dataset: cmap_dataset.yaml
   - _self_
 
-name: 'model_3robots'
+name: 'model_3lefthands'
 
 seed: 42
 gpu:

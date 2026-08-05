@@ -1,7 +1,9 @@
 robot_names:
-  - 'barrett'
-  - 'allegro'
-  - 'shadowhand'
+  - 'allegro_left'
+  - 'xhand_left'
+  - 'fixsharpa_left'
+
+dataset_name: 'cmap_dataset.pt'  # under data/CMapDataset_filtered/, null -> data/MultiDex_filtered/
 
 batch_size: 32
 num_workers: 16

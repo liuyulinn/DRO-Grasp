@@ -4,7 +4,7 @@ defaults:
   - dataset: pretrain_dataset.yaml
   - _self_
 
-name: 'pretrain_3robots'
+name: 'pretrain_3lefthands'
 
 seed: 42
 gpu:

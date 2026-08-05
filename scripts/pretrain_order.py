@@ -16,18 +16,30 @@ from utils.pretrain_utils import dist2weight, infonce_loss
 def main(args):
     encoder = create_encoder_network(emb_dim=512)
 
-    for epoch in args.epoch_list:
+    # `--random_init` evaluates the untrained encoder, which is the only meaningful
+    # baseline: same robots, same objects, same `get_initial_q()` perturbation, so the
+    # number is directly comparable to the trained checkpoints. (Mean order is not
+    # comparable across datasets, so the released pretrain_3robots.pth -- trained on
+    # barrett / allegro_right / shadowhand -- is not a baseline for other robots.)
+    epoch_list = ['random_init'] if args.random_init else args.epoch_list
+
+    for epoch in epoch_list:
         print("****************************************************************")
         print(f"[Epoch {epoch}]")
-        encoder.load_state_dict(
-            torch.load(
-                os.path.join(ROOT_DIR, f'output/{args.pretrain_ckpt}/state_dict/epoch_{epoch}.pth'),
-                map_location=torch.device('cpu')
-            )
-        )
+        if not args.random_init:
+            ckpt_path = os.path.join(ROOT_DIR, f'output/{args.pretrain_ckpt}/state_dict/epoch_{epoch}.pth')
+            if not os.path.exists(ckpt_path):  # also accept a single-file ckpt/pretrain/*.pth
+                released_path = os.path.join(ROOT_DIR, f'ckpt/pretrain/{args.pretrain_ckpt}')
+                assert os.path.exists(released_path), f"neither {ckpt_path} nor {released_path} exists"
+                ckpt_path = released_path
+            encoder.load_state_dict(torch.load(ckpt_path, map_location=torch.device('cpu')))
 
         for robot_name in args.robot_names:
             print(f"Robot: {robot_name}")
+            # Fixed seed so every epoch sees the same grasps / `get_initial_q()` perturbations
+            # / object point samples; otherwise the epoch-to-epoch differences are dominated
+            # by sampling noise. DataLoader derives its worker seeds from the torch RNG.
+            torch.manual_seed(args.seed)
             dataloader = create_dataloader(
                 SimpleNamespace(**{
                     'batch_size': 1,
@@ -76,6 +88,9 @@ if __name__ == '__main__':
                         default=['10', '20', '30', '40', '50', '60', '70', '80', '90', '100'])
     parser.add_argument('--robot_names', type=lambda string: string.split(','),
                         default=['barrett', 'allegro', 'shadowhand'])
+    parser.add_argument('--random_init', action='store_true',
+                        help='evaluate an untrained encoder (baseline); ignores --epoch_list')
+    parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--verbose', action='store_true')
     args = parser.parse_args()
     main(args)

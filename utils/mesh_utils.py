@@ -101,6 +101,32 @@ def create_primitive_mesh(geometry, translation, rotation):
     return apply_transform(mesh, translation, rotation)
 
 
+def resolve_mesh_path(urdf_dir, mesh_filename):
+    """
+    Resolve a URDF mesh filename to a path on disk.
+
+    Handles plain relative paths as well as ROS-style `package://<pkg>/<rel>` URIs,
+    which are resolved by walking up from the URDF directory looking for the package root.
+    """
+    if mesh_filename.startswith("file://"):
+        mesh_filename = mesh_filename[len("file://"):]
+    if not mesh_filename.startswith("package://"):
+        return os.path.join(urdf_dir, mesh_filename)
+
+    package, _, rel_path = mesh_filename[len("package://"):].partition("/")
+    search_dir = os.path.abspath(urdf_dir)
+    for _ in range(5):  # walk up looking for either <dir>/<pkg>/<rel> or <dir>/<rel>
+        for candidate in (os.path.join(search_dir, package, rel_path),
+                          os.path.join(search_dir, rel_path)):
+            if os.path.exists(candidate):
+                return candidate
+        parent = os.path.dirname(search_dir)
+        if parent == search_dir:
+            break
+        search_dir = parent
+    raise FileNotFoundError(f"Cannot resolve '{mesh_filename}' relative to '{urdf_dir}'")
+
+
 def load_link_geometries(robot_name, urdf_path, link_names, collision=False):
     """Load geometries (trimesh objects) for specified links from a URDF file, considering origins."""
     urdf_dir = os.path.dirname(urdf_path)
@@ -122,7 +148,7 @@ def load_link_geometries(robot_name, urdf_path, link_names, collision=False):
                 try:
                     if geometry[0].tag.endswith("mesh"):
                         mesh_filename = geometry[0].attrib["filename"]
-                        full_mesh_path = os.path.join(urdf_dir, mesh_filename)
+                        full_mesh_path = resolve_mesh_path(urdf_dir, mesh_filename)
                         mesh = as_mesh(trimesh.load(full_mesh_path))
                         scale = np.fromstring(geometry[0].attrib.get("scale", "1 1 1"), sep=" ")
                         mesh.apply_scale(scale)

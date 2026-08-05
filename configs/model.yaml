@@ -2,7 +2,9 @@ model:
   emb_dim: 512
   latent_dim: 64
 
-  pretrain: pretrain_3robots.pth
+  # produced by `python pretrain.py` on allegro_left / xhand_left / fixsharpa_left;
+  # the released pretrain_3robots.pth was trained on barrett / allegro_right / shadowhand
+  pretrain: pretrain_3lefthands.pth
 
   center_pc: True
   block_computing: True
