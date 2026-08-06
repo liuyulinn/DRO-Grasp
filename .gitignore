@@ -15,5 +15,6 @@ vis_info/
 wis3d/ 
 
 dro_bodex_output/
+dro_ycb_output/
 
 third_party/
