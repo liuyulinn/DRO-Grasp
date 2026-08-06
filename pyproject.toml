@@ -37,15 +37,18 @@ dependencies = [
     "cvxpy==1.5.2",
     "cvxpylayers==0.1.6",
     "rtree",             # optional, signed-distance checks
-
-    # physics validation -- NVIDIA Isaac Gym Preview 4. Not on PyPI; installed from
-    # a local source checkout via [tool.uv.sources] below. Needed by validate.py's
-    # isaac_main.py subprocess. Requires python <3.9 (matches our 3.8 pin).
-    "isaacgym",
 ]
 
+[project.optional-dependencies]
+# NVIDIA Isaac Gym Preview 4. Not on PyPI -- download the tarball from
+#   https://drive.google.com/file/d/16WFp0n6hzqsVXS0XLU0Tb_54wrKEF8ky/view?usp=sharing
+# then unpack it into ./third_party/isaacgym (so ./third_party/isaacgym/python/setup.py
+# exists) before running `uv sync --extra isaacgym`. Needed by validate.py's
+# isaac_main.py subprocess. Requires python <3.9 (matches our 3.8 pin).
+isaacgym = ["isaacgym"]
+
 [tool.uv.sources]
-isaacgym = { path = "/home/ubuntu/UniFP/isaacgym/python", editable = true }
+isaacgym = { path = "third_party/isaacgym/python", editable = true }
 
 [tool.uv]
 # torch 2.4.1 default wheels are cu121, which matches the driver on the L40S box.
