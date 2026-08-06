@@ -17,7 +17,7 @@ from utils.se3_transform import compute_link_pose
 from utils.optimization import process_transform, create_problem, optimization
 import warnings
 
-from utils.wis3d_new import Wis3D, SAPIENKinematicsModelStandalone
+# from utils.wis3d_new import Wis3D, SAPIENKinematicsModelStandalone
 import hydra
 
 # --- Global variables for models to avoid reloading on every call ---
@@ -26,8 +26,10 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 NETWORK = None
 HAND_MODELS = {}
 
-checkpoint_path = (
-    f"{ROOT_DIR}/ckpt/model/model_3robots.pth"  # IMPORTANT: Change this path
+# Default checkpoint. Override at runtime with Hydra `+checkpoint_path=...`
+# (see GraspPoseProposal.__init__); relative paths are resolved under ROOT_DIR.
+DEFAULT_CHECKPOINT_PATH = (
+    f"{ROOT_DIR}/output/model_3lefthands/state_dict/epoch_10.pth"
 )
 
 
@@ -44,6 +46,11 @@ class GraspPoseProposal:
         self.num_points = 512
         # import pdb; pdb.set_trace()
         self.object_pc_type = cfg.dataset.object_pc_type
+
+        checkpoint_path = getattr(cfg, "checkpoint_path", None) or DEFAULT_CHECKPOINT_PATH
+        if not os.path.isabs(checkpoint_path):
+            checkpoint_path = os.path.join(ROOT_DIR, checkpoint_path)
+        print(f"******** Load network checkpoint from <{checkpoint_path}> ********")
 
         network = create_network(cfg.model, mode="validate").to(device)
         network.load_state_dict(
@@ -322,54 +329,6 @@ class GraspPoseProposal:
                     else torch.cat((transform_batch[k], v), dim=0)
                 )
 
-        # import pdb
-
-        # pdb.set_trace()
-        # debug=True
-        if debug:
-            safe_object_name = object_name.replace("/", "_")
-            wis3d = Wis3D(
-                out_folder="wis3d",
-                sequence_name=f"dro_{safe_object_name}",
-                xyz_pattern=("x", "-y", "-z"),
-            )
-
-            object_pc_batch = object_pc_batch.cpu().numpy()
-            mlat_pc_batch = mlat_pc_batch.cpu().numpy()
-            # robot_pc = robot_pc.cpu().numpy()
-            predict_q_batch_clone = predict_q_batch.clone().cpu().numpy()
-            initial_q_batch = initial_q_batch.cpu().numpy()
-
-            dro_q_order = hand.get_joint_orders()
-            vis_robot = SAPIENKinematicsModelStandalone(hand.urdf_path)
-            vis_q_order = [j.name for j in vis_robot.robot.get_active_joints()]
-
-            print("dro_q_order", dro_q_order)
-            print("vis_q_order", vis_q_order)
-            # import pdb
-
-            # pdb.set_trace()
-            dro_to_vis = [dro_q_order.index(name) for name in vis_q_order]
-
-            for i in range(max(self.batch_size, 4)):
-                wis3d.set_scene_id(i)
-                wis3d.add_point_cloud(object_pc_batch[i], name="object_pc")
-                wis3d.add_point_cloud(mlat_pc_batch[i], name="mlat_pc")
-                # import pdb
-
-                # pdb.set_trace()
-                # wis3d.add_point_cloud(robot_pc[i], name="robot_pc")
-                wis3d.add_robot(
-                    hand.urdf_path,
-                    predict_q_batch_clone[i][dro_to_vis],
-                    name="robot_pred",
-                )
-                wis3d.add_robot(
-                    hand.urdf_path,
-                    initial_q_batch[i][dro_to_vis],
-                    name="robot_init",
-                )
-
         return {
             "predict_q": predict_q_batch,
             "object_pc": object_pc_batch,
@@ -394,7 +353,7 @@ class GraspPoseProposal:
         return hand.get_joint_orders()
 
 
-DGN_ROOT = os.path.join(ROOT_DIR, "data/object/DGN_2k_origin")
+DGN_ROOT = os.path.join(ROOT_DIR, "data/data_urdf/object/DGN_2k_origin")
 DGN_SCENE_CFG_ROOT = os.path.join(DGN_ROOT, "scene_cfg")
 DGN_PROCESSED_ROOT = os.path.join(DGN_ROOT, "processed_data")
 

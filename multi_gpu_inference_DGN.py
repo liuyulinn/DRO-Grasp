@@ -57,6 +57,8 @@ def worker(gpu_id, shard_idx, obj_start, obj_end, args, output_path):
     ]
     if args.hand_name:
         cmd.append(f"+hand_name={args.hand_name}")
+    if args.checkpoint:
+        cmd.append(f"+checkpoint_path={args.checkpoint}")
     if args.overwrite:
         cmd.append("+overwrite=true")
 
@@ -83,6 +85,9 @@ def main():
     p.add_argument("--bodex-scene-kind", default="tabletop_ur10e")
     p.add_argument("--bodex-glob", default="*", help="object_id directory glob")
     p.add_argument("--hand-name", default=None, help="DRO hand_name (auto-inferred if omitted)")
+    p.add_argument("--checkpoint", default=None,
+                   help="network checkpoint .pth (abs, or relative to repo root). "
+                        "If omitted, DEFAULT_CHECKPOINT_PATH in inference_DGN.py is used.")
     p.add_argument("--out-dir", default=os.path.join(ROOT_DIR, "dro_bodex_output"))
     p.add_argument("--batch-size", type=int, default=20,
                    help="dataset.batch_size; should equal n_seeds for 1-to-1 BODex correspondence")

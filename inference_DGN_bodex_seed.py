@@ -51,13 +51,16 @@ sys.path.append(ROOT_DIR)
 from inference_DGN import GraspPoseProposal, load_dgn_scene_cfg, DGN_SCENE_CFG_ROOT
 
 
-BODEX_OUTPUT_ROOT = "/home/ubuntu/BODex/src/curobo/content/assets/output"
+BODEX_OUTPUT_ROOT = "data/bodex/DGN_xhand_left_lifted/graspdata"
 
-# BODex hand tag -> DRO hand_name in urdf_assets_meta.json
+# BODex hand tag -> DRO hand_name in urdf_assets_meta.json.
+# The BODex data here is all left-hand (*_left_lifted) and matches the
+# model_3lefthands checkpoint (trained on allegro_left / xhand_left /
+# fixsharpa_left), so map to the *_left URDF keys.
 DEFAULT_HAND_NAME_FOR_BODEX = {
-    "sim_xhand": "xhand",
-    "sim_fixsharpa": "sharpa",
-    "sim_backallegro": "allegro",
+    "sim_xhand": "xhand_left",
+    "sim_fixsharpa": "fixsharpa_left",
+    "sim_backallegro": "allegro_left",
 }
 
 
